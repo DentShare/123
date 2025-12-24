@@ -6,69 +6,171 @@
     <title>Dental Order</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        .btn { width: 100%; padding: 12px; background-color: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 20px; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+        h2 { margin-top: 0; }
+        .card { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; box-sizing: border-box; }
+        
+        /* Переключатель Зуб/Имплант */
+        .toggle-container { display: flex; margin-bottom: 10px; background: #ddd; border-radius: 8px; padding: 2px; }
+        .toggle-btn { flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 6px; font-size: 14px; }
+        .toggle-btn.active { background: #fff; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        
+        .hidden { display: none; }
+        .btn { width: 100%; padding: 14px; background-color: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h2>Новый заказ</h2>
     
-    <div class="input-group">
-        <label>ID Техника (Временное поле):</label>
-        <input type="number" id="tech_id" placeholder="Введите Telegram ID техника">
-    </div>
-
-    <div class="input-group">
-        <label>ФИО Пациента:</label>
-        <input type="text" id="patient" placeholder="Иванов И.И.">
-    </div>
-
-    <div class="input-group">
-        <label>Зубная формула (пример):</label>
-        <select id="tooth_select">
-            <option value="11">Зуб 11</option>
-            <option value="21">Зуб 21</option>
-            <option value="36">Зуб 36</option>
+    <div class="card">
+        <label>🛠 Выберите техника:</label>
+        <select id="tech_select">
+            <option value="" disabled selected>Загрузка списка...</option>
         </select>
     </div>
 
-    <div class="input-group">
-        <label>Комментарий:</label>
-        <input type="text" id="comment" placeholder="Цвет А2, циркон...">
+    <div class="card">
+        <label>👤 ФИО Пациента:</label>
+        <input type="text" id="patient" placeholder="Например: Иванов И.И.">
     </div>
 
-    <button class="btn" onclick="sendOrder()">Завершить и отправить</button>
+    <div class="card">
+        <label>🦷 Номер зуба:</label>
+        <select id="tooth_number">
+            <option value="11">11 (Верхний правый резец)</option>
+            <option value="21">21 (Верхний левый резец)</option>
+            <option value="36">36 (Нижний левый моляр)</option>
+            <option value="46">46 (Нижний правый моляр)</option>
+            </select>
+
+        <label style="margin-top:10px">Тип опоры:</label>
+        <div class="toggle-container">
+            <div class="toggle-btn active" onclick="setMode('tooth')" id="btn-tooth">На зубе</div>
+            <div class="toggle-btn" onclick="setMode('implant')" id="btn-implant">На импланте</div>
+        </div>
+
+        <div id="block-tooth">
+            <label>Материал:</label>
+            <select id="material">
+                <option value="Zirconia">Диоксид циркония</option>
+                <option value="E-max">E-max (Пресс)</option>
+                <option value="Metal">Металлокерамика</option>
+            </select>
+            <label>Цвет (Vita):</label>
+            <input type="text" id="color" placeholder="A1, A2, BL3...">
+        </div>
+
+        <div id="block-implant" class="hidden">
+            <label>Бренд импланта:</label>
+            <input type="text" id="implant_brand" placeholder="Osstem, Nobel, Straumann...">
+            <label>Тип фиксации:</label>
+            <select id="fixation">
+                <option value="screw">Винтовая</option>
+                <option value="cement">Цементная</option>
+            </select>
+        </div>
+
+        <label style="margin-top:10px">Комментарий:</label>
+        <textarea id="comment" rows="2" placeholder="Особенности..."></textarea>
+    </div>
+
+    <button class="btn" onclick="sendOrder()">🚀 Отправить заказ</button>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрыть на весь экран
+        tg.expand();
 
+        let currentMode = 'tooth';
+
+        // 1. Парсинг списка техников из URL
+        function loadTechnicians() {
+            const params = new URLSearchParams(window.location.search);
+            const techsRaw = params.get('techs');
+            const select = document.getElementById('tech_select');
+            
+            if (techsRaw) {
+                try {
+                    const techs = JSON.parse(techsRaw);
+                    select.innerHTML = ''; // Очистить
+                    techs.forEach(t => {
+                        const opt = document.createElement('option');
+                        opt.value = t.id;
+                        opt.text = t.name;
+                        select.appendChild(opt);
+                    });
+                } catch (e) {
+                    select.innerHTML = '<option>Ошибка загрузки списка</option>';
+                }
+            } else {
+                select.innerHTML = '<option value="">Нет техников (Demo)</option>';
+                // Для теста, если открыли без бота, добавим фейк
+                const opt = document.createElement('option');
+                opt.value = "12345"; opt.text = "Demo Tech";
+                select.appendChild(opt);
+            }
+        }
+
+        // 2. Логика переключения
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-tooth').classList.toggle('active', mode === 'tooth');
+            document.getElementById('btn-implant').classList.toggle('active', mode === 'implant');
+            
+            if (mode === 'tooth') {
+                document.getElementById('block-tooth').classList.remove('hidden');
+                document.getElementById('block-implant').classList.add('hidden');
+            } else {
+                document.getElementById('block-tooth').classList.add('hidden');
+                document.getElementById('block-implant').classList.remove('hidden');
+            }
+        }
+
+        // 3. Сбор данных
         function sendOrder() {
-            const tech_id = document.getElementById('tech_id').value;
+            const tech_id = document.getElementById('tech_select').value;
             const patient = document.getElementById('patient').value;
-            const tooth = document.getElementById('tooth_select').value;
+            const toothNum = document.getElementById('tooth_number').value;
             const comment = document.getElementById('comment').value;
 
             if (!tech_id || !patient) {
-                tg.showAlert("Заполните ID техника и имя пациента!");
+                tg.showAlert("Выберите техника и введите имя пациента!");
                 return;
             }
 
-            // Формируем JSON объект
+            let detail = {};
+            if (currentMode === 'tooth') {
+                detail = {
+                    type: 'tooth',
+                    material: document.getElementById('material').value,
+                    color: document.getElementById('color').value
+                };
+            } else {
+                detail = {
+                    type: 'implant',
+                    brand: document.getElementById('implant_brand').value,
+                    fixation: document.getElementById('fixation').value
+                };
+            }
+
             const data = {
                 tech_id: tech_id,
                 patient: patient,
                 teeth: [
-                    { number: tooth, comment: comment }
+                    { 
+                        number: toothNum, 
+                        ...detail, // Добавляем детали (цвет или бренд)
+                        comment: comment 
+                    }
                 ]
             };
 
-            // Отправляем данные боту
             tg.sendData(JSON.stringify(data));
         }
+
+        // Запуск при загрузке
+        loadTechnicians();
     </script>
 </body>
 </html>
