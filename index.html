@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental Order</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .btn { width: 100%; padding: 12px; background-color: var(--tg-theme-button-color, #3390ec); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>Новый заказ</h2>
+    
+    <div class="input-group">
+        <label>ID Техника (Временное поле):</label>
+        <input type="number" id="tech_id" placeholder="Введите Telegram ID техника">
+    </div>
+
+    <div class="input-group">
+        <label>ФИО Пациента:</label>
+        <input type="text" id="patient" placeholder="Иванов И.И.">
+    </div>
+
+    <div class="input-group">
+        <label>Зубная формула (пример):</label>
+        <select id="tooth_select">
+            <option value="11">Зуб 11</option>
+            <option value="21">Зуб 21</option>
+            <option value="36">Зуб 36</option>
+        </select>
+    </div>
+
+    <div class="input-group">
+        <label>Комментарий:</label>
+        <input type="text" id="comment" placeholder="Цвет А2, циркон...">
+    </div>
+
+    <button class="btn" onclick="sendOrder()">Завершить и отправить</button>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Раскрыть на весь экран
+
+        function sendOrder() {
+            const tech_id = document.getElementById('tech_id').value;
+            const patient = document.getElementById('patient').value;
+            const tooth = document.getElementById('tooth_select').value;
+            const comment = document.getElementById('comment').value;
+
+            if (!tech_id || !patient) {
+                tg.showAlert("Заполните ID техника и имя пациента!");
+                return;
+            }
+
+            // Формируем JSON объект
+            const data = {
+                tech_id: tech_id,
+                patient: patient,
+                teeth: [
+                    { number: tooth, comment: comment }
+                ]
+            };
+
+            // Отправляем данные боту
+            tg.sendData(JSON.stringify(data));
+        }
+    </script>
+</body>
+</html>
